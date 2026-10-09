@@ -4,15 +4,14 @@ Option Explicit
 '=======================================================================
 ' Module      : under30CHF
 ' Procedure   : CreateInkassoEmailUnder30
-' Purpose     : Creates Outlook email drafts (per customer) listing
-'               unpaid invoices under CHF 30.00 (below the Inkasso
-'               transfer limit), based on the newest
-'               "*_Inkassoubergabe.xlsx" file found on OneDrive.
+' Purpose     : Creates Outlook email drafts for unpaid invoices
+'               under CHF 30.00.
 '
-' Notes       : Business logic is unchanged from the original
-'               "CreateInkassoEmailDrafts" procedure. Only the items
-'               requested (renaming, subject format, error handling,
-'               final statistics) were added.
+' tblKunden:
+' E = Merch ID
+' G = eMail für Dokumente
+' H = eMail Praxismanager (fallback)
+' W = Sprache
 '=======================================================================
 
 Sub CreateInkassoEmailUnder30()
@@ -41,10 +40,10 @@ Sub CreateInkassoEmailUnder30()
     Dim language As String
     Dim invoiceLine As String
     Dim mailSubject As String
+    Dim mailBody As String
 
     Dim key As Variant
 
-    ' Statistics counters
     Dim invoicesRead As Long
     Dim draftsCreated As Long
     Dim alreadySentCount As Long
@@ -57,10 +56,8 @@ Sub CreateInkassoEmailUnder30()
     missingEmailCount = 0
     errorsCount = 0
 
-
     Application.ScreenUpdating = False
     Application.EnableEvents = False
-
 
     '-----------------------------------
     ' File location
@@ -68,58 +65,61 @@ Sub CreateInkassoEmailUnder30()
 
     filePath = "C:\Users\Desi\OneDrive - Zaala AG\Desislava @ Zaala AG - Linked Files\Inkasso Excel Table\"
 
-
     fileName = FindInkassoFile(filePath)
 
-
     If fileName = "" Then
-        Err.Raise vbObjectError + 1, "CreateInkassoEmailUnder30", _
-                  "No Inkasso" & Chr(252) & "bergabe file was found."
+        Err.Raise vbObjectError + 1, _
+                  "CreateInkassoEmailUnder30", _
+                  "No Inkassoubergabe file was found."
     End If
-
 
     '-----------------------------------
     ' Extract date from file name
-    ' Example: 20260730_Inkassoubergabe.xlsx -> 30.07.2026
+    ' Example: 20260730_Inkassoubergabe.xlsx
     '-----------------------------------
 
     fileDateRaw = Left(fileName, 8)
 
-    If Not IsDate(Mid(fileDateRaw, 5, 2) & "/" & Right(fileDateRaw, 2) & "/" & Left(fileDateRaw, 4)) Then
-        Err.Raise vbObjectError + 2, "CreateInkassoEmailUnder30", _
+    If Not IsDate(Mid(fileDateRaw, 5, 2) & "/" & _
+                  Right(fileDateRaw, 2) & "/" & _
+                  Left(fileDateRaw, 4)) Then
+
+        Err.Raise vbObjectError + 2, _
+                  "CreateInkassoEmailUnder30", _
                   "The date could not be read from the file name: " & fileName
     End If
 
-    fileDateFormatted = Mid(fileDateRaw, 7, 2) & "." & Mid(fileDateRaw, 5, 2) & "." & Left(fileDateRaw, 4)
-
+    fileDateFormatted = _
+        Mid(fileDateRaw, 7, 2) & "." & _
+        Mid(fileDateRaw, 5, 2) & "." & _
+        Left(fileDateRaw, 4)
 
     '-----------------------------------
     ' Open source file
     '-----------------------------------
 
-    Set wbSource = Workbooks.Open(filePath & fileName, ReadOnly:=True)
-
+    Set wbSource = Workbooks.Open( _
+        filePath & fileName, _
+        ReadOnly:=True)
 
     On Error Resume Next
     Set ws = wbSource.Worksheets("<30CHF")
     On Error GoTo ErrorHandler
 
-
     If ws Is Nothing Then
-        Err.Raise vbObjectError + 3, "CreateInkassoEmailUnder30", _
+        Err.Raise vbObjectError + 3, _
+                  "CreateInkassoEmailUnder30", _
                   "Worksheet <30CHF was not found."
     End If
-
 
     '-----------------------------------
     ' Customer table
     '-----------------------------------
 
-    Set tblCustomers = ThisWorkbook.Worksheets("Kunden").ListObjects("tblKunden")
-
+    Set tblCustomers = _
+        ThisWorkbook.Worksheets("Kunden").ListObjects("tblKunden")
 
     Set dictInvoices = CreateObject("Scripting.Dictionary")
-
 
     '-----------------------------------
     ' Read invoices
@@ -127,26 +127,27 @@ Sub CreateInkassoEmailUnder30()
 
     lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
 
-
     For i = 2 To lastRow
 
         webshopID = Trim(CStr(ws.Cells(i, "A").Value))
 
-
         If webshopID <> "" Then
 
-            invoiceLine = _
-            "- Rechnung Nr. " & ws.Cells(i, "F").Value & _
-            " vom " & ws.Cells(i, "G").Value & _
-            ", Rechnungsbetrag CHF " & Format(ws.Cells(i, "H").Value, "0.00") & _
-            ", Betrag offen " & Format(ws.Cells(i, "I").Value, "0.00") & _
-            ", Patient: " & ws.Cells(i, "J").Value & _
-            " " & ws.Cells(i, "K").Value
-
+            invoiceLine = "- Rechnung Nr. " & ws.Cells(i, "F").Value
+            invoiceLine = invoiceLine & " vom " & ws.Cells(i, "G").Value
+            invoiceLine = invoiceLine & ", Rechnungsbetrag CHF "
+            invoiceLine = invoiceLine & Format(ws.Cells(i, "H").Value, "0.00")
+            invoiceLine = invoiceLine & ", Betrag offen "
+            invoiceLine = invoiceLine & Format(ws.Cells(i, "I").Value, "0.00")
+            invoiceLine = invoiceLine & ", Patient: "
+            invoiceLine = invoiceLine & ws.Cells(i, "J").Value
+            invoiceLine = invoiceLine & " " & ws.Cells(i, "K").Value
 
             If dictInvoices.Exists(webshopID) Then
 
-                dictInvoices(webshopID) = dictInvoices(webshopID) & vbCrLf & invoiceLine
+                dictInvoices(webshopID) = _
+                    dictInvoices(webshopID) & _
+                    vbCrLf & invoiceLine
 
             Else
 
@@ -160,17 +161,14 @@ Sub CreateInkassoEmailUnder30()
 
     Next i
 
-
     wbSource.Close False
     Set wbSource = Nothing
 
-
     '-----------------------------------
-    ' Outlook (late binding)
+    ' Outlook
     '-----------------------------------
 
     Set OutlookApp = CreateObject("Outlook.Application")
-
 
     '-----------------------------------
     ' Create emails
@@ -178,9 +176,13 @@ Sub CreateInkassoEmailUnder30()
 
     For Each key In dictInvoices.Keys
 
-        customerEmail = GetCustomerEmail(CStr(key), tblCustomers)
-        language = GetCustomerLanguage(CStr(key), tblCustomers)
+        customerEmail = GetCustomerEmail( _
+            CStr(key), _
+            tblCustomers)
 
+        language = GetCustomerLanguage( _
+            CStr(key), _
+            tblCustomers)
 
         If customerEmail = "" Then
 
@@ -189,86 +191,146 @@ Sub CreateInkassoEmailUnder30()
         Else
 
             '-----------------------------------
-            ' Subject now includes the Inkassouebergabe date,
-            ' so EmailAlreadySent() automatically prevents
-            ' duplicate drafts only for the same Inkassouebergabe.
+            ' Subject
             '-----------------------------------
 
             If language = "F" Then
 
-                mailSubject = CStr(key) & " | Inkasso" & Chr(252) & "bergabe " & fileDateFormatted & _
-                              " | Factures non transmises " & Chr(224) & " recouvrement"
+                mailSubject = CStr(key)
+                mailSubject = mailSubject & " | Inkasso" & ChrW(252)
+                mailSubject = mailSubject & "bergabe " & fileDateFormatted
+                mailSubject = mailSubject & " | Factures non transmises "
+                mailSubject = mailSubject & ChrW(224)
+                mailSubject = mailSubject & " recouvrement"
 
             Else
 
-                mailSubject = CStr(key) & " | Inkasso" & Chr(252) & "bergabe " & fileDateFormatted & _
-                              " | " & Chr(220) & "berf" & Chr(228) & "llige Rechnungen"
+                mailSubject = CStr(key)
+                mailSubject = mailSubject & " | Inkasso" & ChrW(252)
+                mailSubject = mailSubject & "bergabe " & fileDateFormatted
+                mailSubject = mailSubject & " | " & ChrW(220)
+                mailSubject = mailSubject & "berf" & ChrW(228)
+                mailSubject = mailSubject & "llige Rechnungen"
 
             End If
 
+            '-----------------------------------
+            ' Check Sent Items
+            '-----------------------------------
 
-            If EmailAlreadySent(OutlookApp, customerEmail, mailSubject) Then
+            If EmailAlreadySent( _
+                OutlookApp, _
+                customerEmail, _
+                mailSubject) Then
 
                 alreadySentCount = alreadySentCount + 1
 
             Else
 
-                ' Non-fatal per-item error trapping, so one failed
-                ' draft does not abort the whole run.
+                '-----------------------------------
+                ' Create draft
+                '-----------------------------------
+
                 On Error Resume Next
 
                 Set mail = OutlookApp.CreateItem(0)
 
-                With mail
+                If language = "F" Then
 
-                    .SentOnBehalfOfName = "abrechnung@zaala.ch"
+                    mailBody = "Bonjour,"
+                    mailBody = mailBody & vbCrLf & vbCrLf
 
-                    .To = customerEmail
+                    mailBody = mailBody & _
+                        "Les factures suivantes que vous nous avez soumises n'ont pas "
+                    mailBody = mailBody & "été payées par les patients malgré plusieurs rappels :"
+                    mailBody = mailBody & vbCrLf & vbCrLf
 
-                    .Subject = mailSubject
+                    mailBody = mailBody & dictInvoices(key)
+                    mailBody = mailBody & vbCrLf & vbCrLf
 
+                    mailBody = mailBody & _
+                        "Comme il s'agit de créances inférieures à CHF 30.00 "
+                    mailBody = mailBody & _
+                        "(limite pour le transfert de recouvrement), "
+                    mailBody = mailBody & _
+                        "nous vous prions de nous indiquer si nous devons "
+                    mailBody = mailBody & _
+                        "annuler ces factures ou s'il faut s'attendre à un paiement rapide."
 
-                    If language = "F" Then
+                    mailBody = mailBody & vbCrLf & vbCrLf
+                    mailBody = mailBody & _
+                        "Nous vous remercions pour votre attention."
+                    mailBody = mailBody & vbCrLf
+                    mailBody = mailBody & "Cordialement,"
+                    mailBody = mailBody & vbCrLf
+                    mailBody = mailBody & "Centre de service clients"
+                    mailBody = mailBody & vbCrLf & vbCrLf
+                    mailBody = mailBody & "Zaala AG"
+                    mailBody = mailBody & vbCrLf
+                    mailBody = mailBody & "Bahnhofstrasse 51"
+                    mailBody = mailBody & vbCrLf
+                    mailBody = mailBody & "8500 Frauenfeld"
+                    mailBody = mailBody & vbCrLf
+                    mailBody = mailBody & "abrechnung@zaala.ch"
+                    mailBody = mailBody & vbCrLf
+                    mailBody = mailBody & "www.zaala.ch"
 
-                        .Body = _
-                        "Bonjour," & vbCrLf & vbCrLf & _
-                        "Les factures suivantes que vous nous avez soumises n'ont pas " & Chr(233) & "t" & Chr(233) & " pay" & Chr(233) & "es par les patients malgr" & Chr(233) & " plusieurs rappels :" & _
-                        vbCrLf & vbCrLf & _
-                        dictInvoices(key) & vbCrLf & vbCrLf & _
-                        "Comme il s'agit de cr" & Chr(233) & "ances inf" & Chr(233) & "rieures " & Chr(224) & " CHF 30.00 (limite pour le transfert de recouvrement), nous vous prions de nous indiquer si nous devons annuler ces factures ou s'il faut s'attendre " & Chr(224) & " un paiement rapide." & _
-                        vbCrLf & vbCrLf & _
-                        "Nous vous remercions pour votre attention." & vbCrLf & _
-                        "Cordialement," & vbCrLf & _
-                        "Centre de service clients" & vbCrLf & vbCrLf & _
-                        "Zaala AG" & vbCrLf & _
-                        "Bahnhofstrasse 51" & vbCrLf & _
-                        "8500 Frauenfeld" & vbCrLf & _
-                        "abrechnung@zaala.ch" & vbCrLf & _
-                        "www.zaala.ch"
+                Else
 
-                    Else
+                    mailBody = "Guten Tag"
+                    mailBody = mailBody & vbCrLf & vbCrLf
 
-                        .Body = _
-                        "Guten Tag" & vbCrLf & vbCrLf & _
-                        "Folgende Rechnung, die Sie uns eingereicht haben, wurde von dem Patienten trotz mehreren Mahnungen nicht bezahlt:" & _
-                        vbCrLf & vbCrLf & _
-                        dictInvoices(key) & vbCrLf & vbCrLf & _
-                        "Da es sich um eine Forderung unter CHF 30.00 handelt (Limit f" & Chr(252) & "r Inkasso" & Chr(252) & "bergabe), bitten wir Sie, uns mitzuteilen, ob wir diese Rechnungen stornieren sollten oder eine zeitnahe Zahlung zu erwarten ist." & _
-                        vbCrLf & vbCrLf & _
-                        "Vielen Dank f" & Chr(252) & "r Ihre R" & Chr(252) & "ckmeldung." & vbCrLf & vbCrLf & _
-                        "Zaala AG" & vbCrLf & _
-                        "Bahnhofstrasse 51" & vbCrLf & _
-                        "8500 Frauenfeld" & vbCrLf & _
-                        "abrechnung@zaala.ch" & vbCrLf & _
-                        "www.zaala.ch"
+                    mailBody = mailBody & _
+                        "Folgende Rechnung, die Sie uns eingereicht haben, "
+                    mailBody = mailBody & _
+                        "wurde von dem Patienten trotz mehreren Mahnungen "
+                    mailBody = mailBody & "nicht bezahlt:"
+                    mailBody = mailBody & vbCrLf & vbCrLf
 
-                    End If
+                    mailBody = mailBody & dictInvoices(key)
+                    mailBody = mailBody & vbCrLf & vbCrLf
 
+                    mailBody = mailBody & _
+                        "Da es sich um eine Forderung unter CHF 30.00 handelt "
+                    mailBody = mailBody & _
+                        "(Limit für Inkassoübergabe), "
+                    mailBody = mailBody & _
+                        "bitten wir Sie, uns mitzuteilen, ob wir diese "
+                    mailBody = mailBody & _
+                        "Rechnungen stornieren sollten oder eine zeitnahe "
+                    mailBody = mailBody & _
+                        "Zahlung zu erwarten ist."
 
-                    .Save
+                    mailBody = mailBody & vbCrLf & vbCrLf
 
-                End With
+                    mailBody = mailBody & _
+                        "Vielen Dank für Ihre Rückmeldung."
+                    mailBody = mailBody & vbCrLf & vbCrLf
+                    mailBody = mailBody & "Zaala AG"
+                    mailBody = mailBody & vbCrLf
+                    mailBody = mailBody & "Bahnhofstrasse 51"
+                    mailBody = mailBody & vbCrLf
+                    mailBody = mailBody & "8500 Frauenfeld"
+                    mailBody = mailBody & vbCrLf
+                    mailBody = mailBody & "abrechnung@zaala.ch"
+                    mailBody = mailBody & vbCrLf
+                    mailBody = mailBody & "www.zaala.ch"
 
+                End If
+
+                If Err.Number = 0 Then
+
+                    With mail
+
+                        .SentOnBehalfOfName = "abrechnung@zaala.ch"
+                        .To = customerEmail
+                        .Subject = mailSubject
+                        .Body = mailBody
+                        .Save
+
+                    End With
+
+                End If
 
                 If Err.Number <> 0 Then
 
@@ -291,28 +353,32 @@ Sub CreateInkassoEmailUnder30()
 
     Next key
 
-
     '-----------------------------------
-    ' Final statistics (only shown on normal completion)
+    ' Final statistics
     '-----------------------------------
 
-    MsgBox "Inkasso Email Under 30 CHF" & vbCrLf & vbCrLf & _
-           "Selected file:" & vbCrLf & fileName & vbCrLf & vbCrLf & _
-           "Invoices read:" & vbCrLf & invoicesRead & vbCrLf & vbCrLf & _
-           "Customers:" & vbCrLf & dictInvoices.Count & vbCrLf & vbCrLf & _
-           "Drafts created:" & vbCrLf & draftsCreated & vbCrLf & vbCrLf & _
-           "Already sent:" & vbCrLf & alreadySentCount & vbCrLf & vbCrLf & _
-           "Missing email:" & vbCrLf & missingEmailCount & vbCrLf & vbCrLf & _
-           "Errors:" & vbCrLf & errorsCount, vbInformation
-
+    MsgBox _
+        "Inkasso Email Under 30 CHF" & vbCrLf & vbCrLf & _
+        "Selected file:" & vbCrLf & fileName & vbCrLf & vbCrLf & _
+        "Invoices read:" & vbCrLf & invoicesRead & vbCrLf & vbCrLf & _
+        "Customers:" & vbCrLf & dictInvoices.Count & vbCrLf & vbCrLf & _
+        "Drafts created:" & vbCrLf & draftsCreated & vbCrLf & vbCrLf & _
+        "Already sent:" & vbCrLf & alreadySentCount & vbCrLf & vbCrLf & _
+        "Missing email:" & vbCrLf & missingEmailCount & vbCrLf & vbCrLf & _
+        "Errors:" & vbCrLf & errorsCount, _
+        vbInformation, _
+        "Inkasso Email Under 30 CHF"
 
 CleanExit:
 
     If Not wbSource Is Nothing Then
+
         On Error Resume Next
         wbSource.Close False
         On Error GoTo 0
+
         Set wbSource = Nothing
+
     End If
 
     Application.ScreenUpdating = True
@@ -326,10 +392,13 @@ CleanExit:
 
     Exit Sub
 
-
 ErrorHandler:
 
-    MsgBox "Error " & Err.Number & vbCrLf & Err.Description
+    MsgBox _
+        "Error " & Err.Number & vbCrLf & _
+        Err.Description, _
+        vbCritical, _
+        "Inkasso Email Under 30 CHF"
 
     Resume CleanExit
 
@@ -338,7 +407,7 @@ End Sub
 
 '-----------------------------------
 ' Find newest Inkassoubergabe file
-' matches: *_Inkassoubergabe.xlsx
+' Matches: *_Inkassoubergabe.xlsx
 '-----------------------------------
 
 Function FindInkassoFile(folderPath As String) As String
@@ -377,53 +446,73 @@ Function FindInkassoFile(folderPath As String) As String
 End Function
 
 
-
 '-----------------------------------
 ' Get customer email from tblKunden
-' Column F = Merch ID
-' Column L = Email
+'
+' Column E = Merch ID
+' Column G = eMail für Dokumente
+' Column H = eMail Praxismanager (fallback)
 '-----------------------------------
 
-Function GetCustomerEmail(customerID As String, tbl As ListObject) As String
+Function GetCustomerEmail( _
+    customerID As String, _
+    tbl As ListObject) As String
 
     Dim r As ListRow
-
+    Dim emailDocuments As String
+    Dim emailPraxismanager As String
 
     For Each r In tbl.ListRows
 
-        If Trim(CStr(r.Range.Columns(6).Value)) = customerID Then
+        If Trim(CStr(r.Range.Columns(5).Value)) = customerID Then
 
-            GetCustomerEmail = Trim(CStr(r.Range.Columns(12).Value))
+            emailDocuments = _
+                Trim(CStr(r.Range.Columns(7).Value))
+
+            emailPraxismanager = _
+                Trim(CStr(r.Range.Columns(8).Value))
+
+            If emailDocuments <> "" Then
+
+                GetCustomerEmail = emailDocuments
+
+            Else
+
+                GetCustomerEmail = emailPraxismanager
+
+            End If
+
             Exit Function
 
         End If
 
     Next r
 
-
     GetCustomerEmail = ""
 
 End Function
 
 
-
 '-----------------------------------
 ' Get customer language from tblKunden
-' Column X
+'
+' Column E = Merch ID
+' Column W = Sprache
 '-----------------------------------
 
-Function GetCustomerLanguage(customerID As String, tbl As ListObject) As String
+Function GetCustomerLanguage( _
+    customerID As String, _
+    tbl As ListObject) As String
 
     Dim r As ListRow
     Dim lang As String
 
-
     For Each r In tbl.ListRows
 
-        If Trim(CStr(r.Range.Columns(6).Value)) = customerID Then
+        If Trim(CStr(r.Range.Columns(5).Value)) = customerID Then
 
-            lang = UCase(Trim(CStr(r.Range.Columns(24).Value)))
-
+            lang = UCase( _
+                Trim(CStr(r.Range.Columns(23).Value)))
 
             If Left(lang, 1) = "F" Then
 
@@ -441,20 +530,19 @@ Function GetCustomerLanguage(customerID As String, tbl As ListObject) As String
 
     Next r
 
-
     GetCustomerLanguage = "D"
 
 End Function
-
 
 
 '-----------------------------------
 ' Check Sent Items
 '-----------------------------------
 
-Private Function EmailAlreadySent(ByVal OutlookApp As Object, _
-                                  ByVal Recipient As String, _
-                                  ByVal SubjectText As String) As Boolean
+Private Function EmailAlreadySent( _
+    ByVal OutlookApp As Object, _
+    ByVal Recipient As String, _
+    ByVal SubjectText As String) As Boolean
 
     Dim Ns As Object
     Dim SharedMailbox As Object
@@ -462,17 +550,16 @@ Private Function EmailAlreadySent(ByVal OutlookApp As Object, _
     Dim Items As Object
     Dim FilteredItems As Object
     Dim itm As Object
+
     Dim FilterDate As Date
     Dim Filter As String
 
-
     Set Ns = OutlookApp.GetNamespace("MAPI")
 
-
     On Error Resume Next
-    Set SharedMailbox = Ns.Folders("Zaala Service Center Kunden")
+    Set SharedMailbox = _
+        Ns.Folders("Zaala Service Center Kunden")
     On Error GoTo 0
-
 
     If SharedMailbox Is Nothing Then
 
@@ -481,32 +568,42 @@ Private Function EmailAlreadySent(ByVal OutlookApp As Object, _
 
     End If
 
+    On Error Resume Next
+    Set SentFolder = _
+        SharedMailbox.Folders("Gesendete Elemente")
+    On Error GoTo 0
 
-    Set SentFolder = SharedMailbox.Folders("Gesendete Elemente")
+    If SentFolder Is Nothing Then
 
+        EmailAlreadySent = False
+        Exit Function
+
+    End If
 
     FilterDate = Date - 30
 
-
     Set Items = SentFolder.Items
-
 
     Items.Sort "[SentOn]", True
 
-
-    Filter = "[SentOn] >= '" & Format(FilterDate, "ddddd h:nn AMPM") & "'"
-
+    Filter = _
+        "[SentOn] >= '" & _
+        Format(FilterDate, "ddddd h:nn AMPM") & "'"
 
     Set FilteredItems = Items.Restrict(Filter)
-
 
     For Each itm In FilteredItems
 
         If itm.Class = 43 Then
 
-            If LCase(Trim(itm.Subject)) = LCase(Trim(SubjectText)) Then
+            If LCase(Trim(itm.Subject)) = _
+               LCase(Trim(SubjectText)) Then
 
-                If InStr(1, LCase(itm.To), LCase(Recipient), vbTextCompare) > 0 Then
+                If InStr( _
+                    1, _
+                    LCase(itm.To), _
+                    LCase(Recipient), _
+                    vbTextCompare) > 0 Then
 
                     EmailAlreadySent = True
                     Exit Function
@@ -518,7 +615,6 @@ Private Function EmailAlreadySent(ByVal OutlookApp As Object, _
         End If
 
     Next itm
-
 
     EmailAlreadySent = False
 

@@ -9,7 +9,7 @@ Sub ErstelleInkassoEmails()
     Dim fso As Object
     Dim folder As Object
     Dim file As Object
-    Dim kundenNr As String
+    Dim KundenNr As String
 
     Dim merchID As String
     Dim emailAdresse As String
@@ -22,6 +22,13 @@ Sub ErstelleInkassoEmails()
     Dim heute As Date
     Dim i As Long
 
+    Dim createdCount As Long
+    Dim skippedCount As Long
+    Dim notFoundCount As Long
+    Dim errorCount As Long
+
+    On Error GoTo ErrorHandler
+
     heute = Date
 
     ' Folder where the Inkasso files are stored
@@ -31,7 +38,15 @@ Sub ErstelleInkassoEmails()
     Set ws = ThisWorkbook.Worksheets("Kunden")
     Set tbl = ws.ListObjects("tblKunden")
 
+    ' Check if the folder exists
     Set fso = CreateObject("Scripting.FileSystemObject")
+
+    If Not fso.FolderExists(folderPath) Then
+        MsgBox "The Inkasso folder was not found:" & vbCrLf & vbCrLf & _
+               folderPath, vbCritical, "Folder not found"
+        Exit Sub
+    End If
+
     Set folder = fso.GetFolder(folderPath)
 
     ' Open Outlook application
@@ -40,54 +55,58 @@ Sub ErstelleInkassoEmails()
     ' Check every file in the folder
     For Each file In folder.Files
 
+        On Error GoTo FileError
+
         ' Check if file was modified today
-        If DateValue(file.DateLastModified) = Date Then
+        If DateValue(file.DateLastModified) = heute Then
 
-            ' Extract the first 5 digits from the file name (customer number)
-            kundenNr = Trim(Left(file.Name, 5))
+            ' Extract the first 5 digits from the file name
+            KundenNr = Trim(Left(file.Name, 5))
 
-            ' Search customer number in tblKunden MerchID column
+            ' Search customer number in tblKunden
             For i = 1 To tbl.ListRows.Count
 
-                merchID = Trim(CStr(tbl.DataBodyRange(i, 6).Value))
+                ' Column E = Merch ID
+                merchID = Trim(CStr(tbl.DataBodyRange(i, 5).Value))
 
-                If merchID = kundenNr Then
+                If merchID = KundenNr Then
 
-                    ' Get customer email address and language
-                    emailAdresse = Trim(tbl.DataBodyRange(i, 12).Value) ' Column L: eMailfuerDokumente
-                    sprache = Trim(tbl.DataBodyRange(i, 24).Value)      ' Column X: Sprache
+                    ' Column G = eMail fur Dokumente
+                    emailAdresse = Trim(CStr(tbl.DataBodyRange(i, 7).Value))
+
+                    ' Column W = Sprache
+                    sprache = Trim(CStr(tbl.DataBodyRange(i, 23).Value))
 
                     If emailAdresse <> "" Then
 
                         ' Build email subject based on customer language
                         If UCase(sprache) = "F" Then
 
-                            Betreff = kundenNr & " Transfert a l'agence de recouvrement " & Format(heute, "dd.mm.yyyy")
+                            Betreff = KundenNr & _
+                                      " Transfert a l'agence de recouvrement " & _
+                                      Format(heute, "dd.mm.yyyy")
 
                         ElseIf UCase(sprache) = "D" Then
 
-                            Betreff = kundenNr & " Inkassoubergabe " & Format(heute, "dd.mm.yyyy")
+                            Betreff = KundenNr & _
+                                      " Inkassoubergabe " & _
+                                      Format(heute, "dd.mm.yyyy")
 
                         Else
 
+                            skippedCount = skippedCount + 1
                             GoTo CustomerProcessed
 
                         End If
 
-
-                        ' Check whether the same email has already been sent during the last 30 days
+                        ' Check whether the same email has already been sent
+                        ' during the last 30 days
                         If MailAlreadySent(OutlookApp, emailAdresse, Betreff) Then
 
-                            MsgBox "An email with the subject:" & vbCrLf & _
-                                   Betreff & vbCrLf & vbCrLf & _
-                                   "has already been sent to:" & vbCrLf & _
-                                   emailAdresse, _
-                                   vbExclamation, "Email already sent"
-
+                            skippedCount = skippedCount + 1
                             GoTo NextFile
 
                         End If
-
 
                         ' Create a new Outlook email
                         Set mail = OutlookApp.CreateItem(0)
@@ -106,8 +125,7 @@ Sub ErstelleInkassoEmails()
                             ' Add Inkasso file as attachment
                             .Attachments.Add file.Path
 
-
-                            If IsSpecialCustomer(kundenNr) Then
+                            If IsSpecialCustomer(KundenNr) Then
 
                                 ' French email
                                 If UCase(sprache) = "F" Then
@@ -115,7 +133,7 @@ Sub ErstelleInkassoEmails()
                                     .Body = _
                                     "Bonjour," & vbCrLf & vbCrLf & _
                                     "Veuillez trouver ci-joint la liste des transferts de collecte d'aujourd'hui." & vbCrLf & vbCrLf & _
-                                    "N'hésitez pas à nous contacter si vous avez des questions." & vbCrLf & vbCrLf & _
+                                    "N'h" & ChrW(233) & "sitez pas " & ChrW(224) & " nous contacter si vous avez des questions." & vbCrLf & vbCrLf & _
                                     "Cordialement," & vbCrLf & vbCrLf & _
                                     "Centre de service clients" & vbCrLf & vbCrLf & _
                                     "Zaala AG" & vbCrLf & _
@@ -124,15 +142,14 @@ Sub ErstelleInkassoEmails()
                                     "abrechnung@zaala.ch" & vbCrLf & _
                                     "www.zaala.ch"
 
-
                                 ' German email
                                 ElseIf UCase(sprache) = "D" Then
 
                                     .Body = _
                                     "Sehr geehrte Damen und Herren" & vbCrLf & vbCrLf & _
-                                    "In der Beilage finden Sie die Auflistung der heutigen Inkassoübergaben." & vbCrLf & vbCrLf & _
-                                    "Für Fragen stehen wir Ihnen gerne zur Verfügung." & vbCrLf & vbCrLf & _
-                                    "Freundliche Grüsse" & vbCrLf & vbCrLf & _
+                                    "In der Beilage finden Sie die Auflistung der heutigen Inkasso" & ChrW(252) & "bergaben." & vbCrLf & vbCrLf & _
+                                    "F" & ChrW(252) & "r Fragen stehen wir Ihnen gerne zur Verf" & ChrW(252) & "gung." & vbCrLf & vbCrLf & _
+                                    "Freundliche Gr" & ChrW(252) & "sse" & vbCrLf & vbCrLf & _
                                     "Kundendienst Zaala AG" & vbCrLf & vbCrLf & _
                                     "Zaala AG" & vbCrLf & _
                                     "Bahnhofstrasse 51" & vbCrLf & _
@@ -144,51 +161,55 @@ Sub ErstelleInkassoEmails()
 
                             Else
 
-                            ' French email
-                            If UCase(sprache) = "F" Then
+                                ' French email
+                                If UCase(sprache) = "F" Then
 
-                                .Body = _
-                                "Bonjour," & vbCrLf & vbCrLf & _
-                                "Veuillez trouver ci-joint la liste des transferts de collecte d'aujourd'hui." & vbCrLf & _
-                                "La retrofacturation correspondante sera visible lors du prochain paiement." & vbCrLf & _
-                                "N'hesitez pas a nous contacter si vous avez des questions." & vbCrLf & vbCrLf & _
-                                "Cordialement," & vbCrLf & _
-                                "Centre de service clients" & vbCrLf & vbCrLf & _
-                                "Zaala AG" & vbCrLf & _
-                                "Bahnhofstrasse 51" & vbCrLf & _
-                                "8500 Frauenfeld" & vbCrLf & _
-                                "abrechnung@zaala.ch" & vbCrLf & _
-                                "www.zaala.ch"
+                                    .Body = _
+                                    "Bonjour," & vbCrLf & vbCrLf & _
+                                    "Veuillez trouver ci-joint la liste des transferts de collecte d'aujourd'hui." & vbCrLf & _
+                                    "La r" & ChrW(233) & "trofacturation correspondante sera visible lors du prochain paiement." & vbCrLf & _
+                                    "N'h" & ChrW(233) & "sitez pas " & ChrW(224) & " nous contacter si vous avez des questions." & vbCrLf & vbCrLf & _
+                                    "Cordialement," & vbCrLf & _
+                                    "Centre de service clients" & vbCrLf & vbCrLf & _
+                                    "Zaala AG" & vbCrLf & _
+                                    "Bahnhofstrasse 51" & vbCrLf & _
+                                    "8500 Frauenfeld" & vbCrLf & _
+                                    "abrechnung@zaala.ch" & vbCrLf & _
+                                    "www.zaala.ch"
 
+                                ' German email
+                                ElseIf UCase(sprache) = "D" Then
 
-                            ' German email
-                            ElseIf UCase(sprache) = "D" Then
+                                    .Body = _
+                                    "Sehr geehrte Damen und Herren" & vbCrLf & vbCrLf & _
+                                    "In der Beilage finden Sie die Auflistung der heutigen Inkasso" & ChrW(252) & "bergaben." & vbCrLf & _
+                                    "Die entsprechende R" & ChrW(252) & "ckbelastung wird bei der n" & ChrW(228) & "chsten Auszahlung ersichtlich sein." & vbCrLf & _
+                                    "F" & ChrW(252) & "r Fragen stehen wir Ihnen gerne zur Verf" & ChrW(252) & "gung." & vbCrLf & vbCrLf & _
+                                    "Freundliche Gr" & ChrW(252) & "sse" & vbCrLf & _
+                                    "Kundendienst Zaala AG" & vbCrLf & vbCrLf & _
+                                    "Zaala AG" & vbCrLf & _
+                                    "Bahnhofstrasse 51" & vbCrLf & _
+                                    "8500 Frauenfeld" & vbCrLf & _
+                                    "abrechnung@zaala.ch" & vbCrLf & _
+                                    "www.zaala.ch"
 
-                                .Body = _
-                                "Sehr geehrte Damen und Herren" & vbCrLf & vbCrLf & _
-                                "In der Beilage finden Sie die Auflistung der heutigen Inkassoubergaben." & vbCrLf & _
-                                "Die entsprechende Ruckbelastung wird bei der nachsten Auszahlung ersichtlich sein." & vbCrLf & _
-                                "Fur Fragen stehen wir Ihnen gerne zur Verfugung." & vbCrLf & vbCrLf & _
-                                "Freundliche Grusse" & vbCrLf & _
-                                "Kundendienst Zaala AG" & vbCrLf & vbCrLf & _
-                                "Zaala AG" & vbCrLf & _
-                                "Bahnhofstrasse 51" & vbCrLf & _
-                                "8500 Frauenfeld" & vbCrLf & _
-                                "abrechnung@zaala.ch" & vbCrLf & _
-                                "www.zaala.ch"
+                                End If
 
                             End If
-
-                            End If
-
 
                             ' Save email as draft
                             .Save
 
                         End With
 
-                    End If
+                        createdCount = createdCount + 1
 
+                    Else
+
+                        ' No email address in column G
+                        skippedCount = skippedCount + 1
+
+                    End If
 
 CustomerProcessed:
 
@@ -199,34 +220,71 @@ CustomerProcessed:
 
             Next i
 
-        End If
+            ' Customer number was not found
+            If i > tbl.ListRows.Count Then
+                notFoundCount = notFoundCount + 1
+            End If
 
+        End If
 
 NextFile:
 
+        On Error GoTo ErrorHandler
+
     Next file
 
+    MsgBox _
+        "Inkasso emails have been created as drafts." & vbCrLf & vbCrLf & _
+        "Created: " & createdCount & vbCrLf & _
+        "Skipped: " & skippedCount & vbCrLf & _
+        "Customer not found: " & notFoundCount & vbCrLf & _
+        "Errors: " & errorCount, _
+        vbInformation, "Inkasso emails"
 
-    MsgBox "Inkasso emails have been created as drafts.", vbInformation
+    Exit Sub
 
+
+FileError:
+
+    errorCount = errorCount + 1
+    Err.Clear
+    Resume NextFile
+
+
+ErrorHandler:
+
+    MsgBox _
+        "An unexpected error occurred." & vbCrLf & vbCrLf & _
+        "Error: " & Err.Description, _
+        vbCritical, "Inkasso Email Automation"
 
 End Sub
-
 
 
 Private Function IsSpecialCustomer(ByVal KundenNr As String) As Boolean
 
     Select Case KundenNr
 
-        Case "85580", "85585", "85590", "85661", "85662", "85666", "85667", _
-             "85670", "85671", "85935", "85945", "85950", "85955"
+        Case "85580", "85585", "85590", _
+             "85661", "85662", "85666", "85667", _
+             "85670", "85671", _
+             "85935", "85945"
 
             IsSpecialCustomer = True
+            Exit Function
 
     End Select
 
-End Function
+    If Left$(KundenNr, 2) = "95" Then
 
+        IsSpecialCustomer = True
+        Exit Function
+
+    End If
+
+    IsSpecialCustomer = False
+
+End Function
 
 
 Private Function MailAlreadySent(ByVal OutlookApp As Object, _
@@ -239,95 +297,97 @@ Private Function MailAlreadySent(ByVal OutlookApp As Object, _
     Dim Items As Object
     Dim FilteredItems As Object
     Dim itm As Object
+
     Dim FilterDate As Date
     Dim Filter As String
 
+    On Error GoTo ErrorHandler
 
     ' Get Outlook namespace
     Set Ns = OutlookApp.GetNamespace("MAPI")
 
-
     ' Get shared mailbox
+    Set SharedMailbox = Nothing
+
     On Error Resume Next
     Set SharedMailbox = Ns.Folders("Zaala Service Center Kunden")
-    On Error GoTo 0
-
+    On Error GoTo ErrorHandler
 
     If SharedMailbox Is Nothing Then
 
-        MsgBox "Shared mailbox 'Zaala Service Center Kunden' was not found in Outlook.", vbCritical
+        MsgBox _
+            "Shared mailbox 'Zaala Service Center Kunden' was not found in Outlook.", _
+            vbCritical, "Shared mailbox not found"
 
         MailAlreadySent = False
         Exit Function
 
     End If
 
-
     ' Get Sent Items folder of shared mailbox
+    Set SentFolder = Nothing
+
     On Error Resume Next
     Set SentFolder = SharedMailbox.Folders("Gesendete Elemente")
-    On Error GoTo 0
-
+    On Error GoTo ErrorHandler
 
     If SentFolder Is Nothing Then
 
-        MsgBox "Folder 'Gesendete Elemente' was not found in shared mailbox.", vbCritical
+        MsgBox _
+            "Folder 'Gesendete Elemente' was not found in shared mailbox.", _
+            vbCritical, "Sent Items folder not found"
 
         MailAlreadySent = False
         Exit Function
 
     End If
-
 
     ' Search only emails sent during the last 30 days
     FilterDate = Date - 30
 
-
     Set Items = SentFolder.Items
-
 
     ' Sort emails by sent date descending
     Items.Sort "[SentOn]", True
 
-
     ' Build Outlook filter
-    Filter = "[SentOn] >= '" & Format(FilterDate, "ddddd h:nn AMPM") & "'"
-
+    Filter = "[SentOn] >= '" & _
+             Format(FilterDate, "ddddd h:nn AMPM") & "'"
 
     Set FilteredItems = Items.Restrict(Filter)
-
 
     ' Check matching emails
     For Each itm In FilteredItems
 
-
         If itm.Class = 43 Then
 
+            If LCase(Trim(itm.Subject)) = _
+               LCase(Trim(SubjectText)) Then
 
-            If LCase(Trim(itm.Subject)) = LCase(Trim(SubjectText)) Then
-
-
-                If InStr(1, LCase(itm.To), LCase(Recipient), vbTextCompare) > 0 Then
-
+                If InStr(1, _
+                         LCase(itm.To), _
+                         LCase(Recipient), _
+                         vbTextCompare) > 0 Then
 
                     MailAlreadySent = True
                     Exit Function
 
-
                 End If
-
 
             End If
 
-
         End If
-
 
     Next itm
 
+    MailAlreadySent = False
+    Exit Function
 
+
+ErrorHandler:
+
+    ' If the Sent Items search fails,
+    ' allow the email to be created.
     MailAlreadySent = False
 
-
 End Function
-
