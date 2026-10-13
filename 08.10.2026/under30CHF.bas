@@ -9,7 +9,7 @@ Option Explicit
 '
 ' tblKunden:
 ' E = Merch ID
-' G = eMail für Dokumente
+' G = eMail fï¿½r Dokumente
 ' H = eMail Praxismanager (fallback)
 ' W = Sprache
 '=======================================================================
@@ -63,7 +63,7 @@ Sub CreateInkassoEmailUnder30()
     ' File location
     '-----------------------------------
 
-    filePath = "C:\Users\Desi\OneDrive - Zaala AG\Desislava @ Zaala AG - Linked Files\Inkasso Excel Table\"
+    filePath = "...\Inkasso Excel Table\"
 
     fileName = FindInkassoFile(filePath)
 
@@ -242,20 +242,20 @@ Sub CreateInkassoEmailUnder30()
 
                     mailBody = mailBody & _
                         "Les factures suivantes que vous nous avez soumises n'ont pas "
-                    mailBody = mailBody & "été payées par les patients malgré plusieurs rappels :"
+                    mailBody = mailBody & "ï¿½tï¿½ payï¿½es par les patients malgrï¿½ plusieurs rappels :"
                     mailBody = mailBody & vbCrLf & vbCrLf
 
                     mailBody = mailBody & dictInvoices(key)
                     mailBody = mailBody & vbCrLf & vbCrLf
 
                     mailBody = mailBody & _
-                        "Comme il s'agit de créances inférieures à CHF 30.00 "
+                        "Comme il s'agit de crï¿½ances infï¿½rieures ï¿½ CHF 30.00 "
                     mailBody = mailBody & _
                         "(limite pour le transfert de recouvrement), "
                     mailBody = mailBody & _
                         "nous vous prions de nous indiquer si nous devons "
                     mailBody = mailBody & _
-                        "annuler ces factures ou s'il faut s'attendre à un paiement rapide."
+                        "annuler ces factures ou s'il faut s'attendre ï¿½ un paiement rapide."
 
                     mailBody = mailBody & vbCrLf & vbCrLf
                     mailBody = mailBody & _
@@ -271,7 +271,7 @@ Sub CreateInkassoEmailUnder30()
                     mailBody = mailBody & vbCrLf
                     mailBody = mailBody & "8500 Frauenfeld"
                     mailBody = mailBody & vbCrLf
-                    mailBody = mailBody & "abrechnung@zaala.ch"
+                    mailBody = mailBody & "xxx@zaala.ch"
                     mailBody = mailBody & vbCrLf
                     mailBody = mailBody & "www.zaala.ch"
 
@@ -293,7 +293,7 @@ Sub CreateInkassoEmailUnder30()
                     mailBody = mailBody & _
                         "Da es sich um eine Forderung unter CHF 30.00 handelt "
                     mailBody = mailBody & _
-                        "(Limit für Inkassoübergabe), "
+                        "(Limit fï¿½r Inkassoï¿½bergabe), "
                     mailBody = mailBody & _
                         "bitten wir Sie, uns mitzuteilen, ob wir diese "
                     mailBody = mailBody & _
@@ -304,7 +304,7 @@ Sub CreateInkassoEmailUnder30()
                     mailBody = mailBody & vbCrLf & vbCrLf
 
                     mailBody = mailBody & _
-                        "Vielen Dank für Ihre Rückmeldung."
+                        "Vielen Dank fï¿½r Ihre Rï¿½ckmeldung."
                     mailBody = mailBody & vbCrLf & vbCrLf
                     mailBody = mailBody & "Zaala AG"
                     mailBody = mailBody & vbCrLf
@@ -312,7 +312,7 @@ Sub CreateInkassoEmailUnder30()
                     mailBody = mailBody & vbCrLf
                     mailBody = mailBody & "8500 Frauenfeld"
                     mailBody = mailBody & vbCrLf
-                    mailBody = mailBody & "abrechnung@zaala.ch"
+                    mailBody = mailBody & "xxx@zaala.ch"
                     mailBody = mailBody & vbCrLf
                     mailBody = mailBody & "www.zaala.ch"
 
@@ -322,7 +322,7 @@ Sub CreateInkassoEmailUnder30()
 
                     With mail
 
-                        .SentOnBehalfOfName = "abrechnung@zaala.ch"
+                        .SentOnBehalfOfName = "xxx@zaala.ch"
                         .To = customerEmail
                         .Subject = mailSubject
                         .Body = mailBody
@@ -450,7 +450,7 @@ End Function
 ' Get customer email from tblKunden
 '
 ' Column E = Merch ID
-' Column G = eMail für Dokumente
+' Column G = eMail fï¿½r Dokumente
 ' Column H = eMail Praxismanager (fallback)
 '-----------------------------------
 

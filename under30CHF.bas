@@ -63,7 +63,7 @@ Sub CreateInkassoEmailUnder30()
     ' File location
     '-----------------------------------
 
-    filePath = "C:\Users\Desi\OneDrive - Zaala AG\Desislava @ Zaala AG - Linked Files\Inkasso Excel Table\"
+    filePath = "xxx\Inkasso Excel Table\"
 
     fileName = FindInkassoFile(filePath)
 
@@ -271,7 +271,7 @@ Sub CreateInkassoEmailUnder30()
                     mailBody = mailBody & vbCrLf
                     mailBody = mailBody & "8500 Frauenfeld"
                     mailBody = mailBody & vbCrLf
-                    mailBody = mailBody & "abrechnung@zaala.ch"
+                    mailBody = mailBody & "xxx@zaala.ch"
                     mailBody = mailBody & vbCrLf
                     mailBody = mailBody & "www.zaala.ch"
 
@@ -312,7 +312,7 @@ Sub CreateInkassoEmailUnder30()
                     mailBody = mailBody & vbCrLf
                     mailBody = mailBody & "8500 Frauenfeld"
                     mailBody = mailBody & vbCrLf
-                    mailBody = mailBody & "abrechnung@zaala.ch"
+                    mailBody = mailBody & "xxx@zaala.ch"
                     mailBody = mailBody & vbCrLf
                     mailBody = mailBody & "www.zaala.ch"
 
@@ -322,7 +322,7 @@ Sub CreateInkassoEmailUnder30()
 
                     With mail
 
-                        .SentOnBehalfOfName = "abrechnung@zaala.ch"
+                        .SentOnBehalfOfName = "xxx@zaala.ch"
                         .To = customerEmail
                         .Subject = mailSubject
                         .Body = mailBody

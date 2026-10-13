@@ -32,7 +32,7 @@ Sub ErstelleInkassoEmails()
     heute = Date
 
     ' Folder where the Inkasso files are stored
-    folderPath = "C:\Users\Desi\OneDrive - Zaala AG\Desislava @ Zaala AG - Linked Files\Inkasso Excel Table\UebergabenForPraxen\"
+    folderPath = "...\UebergabenForPraxen\"
 
     ' Reference to the customer table
     Set ws = ThisWorkbook.Worksheets("Kunden")
@@ -139,7 +139,7 @@ Sub ErstelleInkassoEmails()
                                     "Zaala AG" & vbCrLf & _
                                     "Bahnhofstrasse 51" & vbCrLf & _
                                     "8500 Frauenfeld" & vbCrLf & _
-                                    "abrechnung@zaala.ch" & vbCrLf & _
+                                    "xxx@zaala.ch" & vbCrLf & _
                                     "www.zaala.ch"
 
                                 ' German email
@@ -154,7 +154,7 @@ Sub ErstelleInkassoEmails()
                                     "Zaala AG" & vbCrLf & _
                                     "Bahnhofstrasse 51" & vbCrLf & _
                                     "8500 Frauenfeld" & vbCrLf & _
-                                    "abrechnung@zaala.ch" & vbCrLf & _
+                                    "xxx@zaala.ch" & vbCrLf & _
                                     "www.zaala.ch"
 
                                 End If
@@ -174,7 +174,7 @@ Sub ErstelleInkassoEmails()
                                     "Zaala AG" & vbCrLf & _
                                     "Bahnhofstrasse 51" & vbCrLf & _
                                     "8500 Frauenfeld" & vbCrLf & _
-                                    "abrechnung@zaala.ch" & vbCrLf & _
+                                    "xxx@zaala.ch" & vbCrLf & _
                                     "www.zaala.ch"
 
                                 ' German email
@@ -190,7 +190,7 @@ Sub ErstelleInkassoEmails()
                                     "Zaala AG" & vbCrLf & _
                                     "Bahnhofstrasse 51" & vbCrLf & _
                                     "8500 Frauenfeld" & vbCrLf & _
-                                    "abrechnung@zaala.ch" & vbCrLf & _
+                                    "xxx@zaala.ch" & vbCrLf & _
                                     "www.zaala.ch"
 
                                 End If
